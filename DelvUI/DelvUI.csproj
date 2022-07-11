@@ -89,7 +89,7 @@
 
     <!-- NuGet Packages -->
     <ItemGroup>
-        <PackageReference Include="DalamudPackager" Version="2.1.6" />
+        <PackageReference Include="DalamudPackager" Version="2.1.7" />
         <PackageReference Include="Colourful" Version="3.1.0" />
     </ItemGroup>
 
