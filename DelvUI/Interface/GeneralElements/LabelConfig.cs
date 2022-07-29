@@ -1,6 +1,8 @@
-﻿using DelvUI.Config;
+﻿using Dalamud.Interface;
+using DelvUI.Config;
 using DelvUI.Config.Attributes;
 using DelvUI.Enums;
+using ImGuiNET;
 using Newtonsoft.Json;
 using System;
 using System.Globalization;
@@ -35,7 +37,7 @@ namespace DelvUI.Interface.GeneralElements
         [Combo("Number Format", "No Decimals (i.e. \"12\")", "One Decimal (i.e. \"12.3\")", "Two Decimals (i.e. \"12.34\")")]
         [Order(10)]
         public int NumberFormat;
-        
+
         [Combo("Rounding Mode", "Truncate", "Floor", "Ceil", "Round")]
         [Order(15)]
         public int NumberFunction;
@@ -87,6 +89,42 @@ namespace DelvUI.Interface.GeneralElements
                 Enabled = Enabled,
                 HideIfZero = HideIfZero
             };
+    }
+
+    [DisableParentSettings("FontID")]
+    [Exportable(false)]
+    public class IconLabelConfig : LabelConfig
+    {
+        [DragFloat("Scale", min = 1, max = 5, velocity = 0.05f)]
+        [Order(11)]
+        public float FontScale = 1;
+
+        public FontAwesomeIcon IconId;
+
+        public IconLabelConfig(Vector2 position, FontAwesomeIcon iconId, DrawAnchor frameAnchor, DrawAnchor textAnchor) : base(position, "", frameAnchor, textAnchor)
+        {
+            IconId = iconId;
+        }
+
+        public override string GetText() => IconId.ToIconString();
+        public override float GetFontScale() => FontScale;
+    }
+
+    [DisableParentSettings("FontID")]
+    [Exportable(false)]
+    public class DefaultFontLabelConfig : LabelConfig
+    {
+        [DragFloat("Scale", min = 1, max = 5, velocity = 0.05f)]
+        [Order(11)]
+        public float FontScale = 1;
+
+        public DefaultFontLabelConfig(Vector2 position, string text, DrawAnchor frameAnchor, DrawAnchor textAnchor)
+            : base(position, text, frameAnchor, textAnchor)
+        {
+        }
+
+        public override bool UseSystemFont() => true;
+        public override float GetFontScale() => FontScale;
     }
 
     [Exportable(false)]
@@ -155,5 +193,8 @@ namespace DelvUI.Interface.GeneralElements
         {
             _text = text;
         }
+
+        public virtual bool UseSystemFont() => false;
+        public virtual float GetFontScale() => 1;
     }
 }

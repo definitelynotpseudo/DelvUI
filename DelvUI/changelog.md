@@ -1,3 +1,21 @@
+# 1.2.1.0
+Features:
+- Added an icon to the experience bar that shows when the player is in a sanctuary.
+- Order Labels for Party Frames and Enemy List now uses the same symbols from the game:
+    + This means it will no longer be a text like '[A]' or '[1]'.
+    + These labels will no longer use a custom font, instead theres a Scale setting to make them bigger.
+    + Due to this changes, these label's settings were reset.
+
+Fixes:
+- Fixed cooldown for Troubadour, Shield Samba and Tactician in Party Cooldowns:
+    + It now adapts to the level of each player to account for the level 88 trait that reduces the cooldown from 120s to 90s.
+    + The cooldown will now read as "90-120" in the list for these actions.
+
+# 1.2.0.1
+Fixes:
+- Fixed DelVUI sometimes crashing on startup.
+- Fixed hotbar commands being spammed in the chat.
+
 # 1.2.0.0
 Features:
 - Completely reworked visibility options for DelvUI elements and the game's hotbars:
