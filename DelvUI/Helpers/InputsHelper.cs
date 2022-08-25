@@ -25,14 +25,14 @@ using Dalamud.Hooking;
 using Dalamud.Logging;
 using DelvUI.Config;
 using DelvUI.Interface.GeneralElements;
+using FFXIVClientStructs.FFXIV.Client.Game;
+using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using FFXIVClientStructs.FFXIV.Client.System.Framework;
 using ImGuiNET;
 using Lumina.Excel;
 using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using FFXIVClientStructs.FFXIV.Client.Game;
-using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using Action = Lumina.Excel.GeneratedSheets.Action;
 using GameObject = Dalamud.Game.ClientState.Objects.Types.GameObject;
 
@@ -41,26 +41,38 @@ namespace DelvUI.Helpers
     public unsafe class InputsHelper : IDisposable
     {
         public delegate void OnSetUIMouseoverActor(long arg1, long arg2);
-        //private delegate bool UseActionDelegate(IntPtr manager, ActionType actionType, uint actionId, GameObjectID targetId, uint a4, uint a5, uint a6, IntPtr a7);
+        private delegate bool UseActionDelegate(IntPtr manager, ActionType actionType, uint actionId, GameObjectID targetId, uint a4, uint a5, uint a6, IntPtr a7);
 
         #region Singleton
         private InputsHelper()
         {
             _sheet = Plugin.DataManager.GetExcelSheet<Action>();
 
-            /*
-             Part of setUIMouseOverActorId disassembly signature
-            .text:00007FF64830FD70                   sub_7FF64830FD70 proc near
-            .text:00007FF64830FD70 48 89 91 90 02 00+mov     [rcx+290h], rdx
-            .text:00007FF64830FD70 00
-            */
-            _setUIMouseOverActor = Plugin.SigScanner.ScanText("E8 ?? ?? ?? ?? 48 8B 6C 24 ?? 48 8B 5C 24 ?? 4C 8B 7C 24 ?? 41 83 FC 02");
-            //_uiMouseOverActorHook = Hook<OnSetUIMouseoverActor>.FromAddress(_setUIMouseOverActor, new OnSetUIMouseoverActor(HandleUIMouseOverActorId));
-            _uiMouseOverActorHook = new Hook<OnSetUIMouseoverActor>(_setUIMouseOverActor, new OnSetUIMouseoverActor(HandleUIMouseOverActorId));
+            try
+            {
+                /*
+                 Part of setUIMouseOverActorId disassembly signature
+                .text:00007FF64830FD70                   sub_7FF64830FD70 proc near
+                .text:00007FF64830FD70 48 89 91 90 02 00+mov     [rcx+290h], rdx
+                .text:00007FF64830FD70 00
+                */
+                _setUIMouseOverActor = Plugin.SigScanner.ScanText("E8 ?? ?? ?? ?? 48 8B 6C 24 ?? 48 8B 5C 24 ?? 4C 8B 7C 24 ?? 41 83 FC 02");
+                _uiMouseOverActorHook = Hook<OnSetUIMouseoverActor>.FromAddress(_setUIMouseOverActor, new OnSetUIMouseoverActor(HandleUIMouseOverActorId));
+            }
+            catch
+            {
+                PluginLog.Error("InputsHelper OnSetUIMouseoverActor Hook failed!!!");
+            }
 
-            //_requestActionHook = Hook<UseActionDelegate>.FromAddress((IntPtr)ActionManager.fpUseAction, HandleRequestAction);
-            //_requestActionHook = new Hook<UseActionDelegate>((IntPtr)ActionManager.fpUseAction, HandleRequestAction);
-            //_requestActionHook.Enable();
+            try
+            {
+                _requestActionHook = Hook<UseActionDelegate>.FromAddress((IntPtr)ActionManager.fpUseAction, HandleRequestAction);
+                _requestActionHook?.Enable();
+            }
+            catch
+            {
+                PluginLog.Error("InputsHelper UseActionDelegate Hook failed!!!");
+            }
 
             // mouseover setting
             ConfigurationManager.Instance.ResetEvent += OnConfigReset;
@@ -94,8 +106,8 @@ namespace DelvUI.Helpers
             _uiMouseOverActorHook?.Disable();
             _uiMouseOverActorHook?.Dispose();
 
-            //_requestActionHook?.Disable();
-            //_requestActionHook?.Dispose();
+            _requestActionHook?.Disable();
+            _requestActionHook?.Dispose();
 
             // give imgui the control of inputs again
             if (_wndHandle != IntPtr.Zero && _imguiWndProcPtr != IntPtr.Zero)
@@ -112,7 +124,7 @@ namespace DelvUI.Helpers
         private IntPtr _setUIMouseOverActor;
         private Hook<OnSetUIMouseoverActor>? _uiMouseOverActorHook;
 
-        //private Hook<UseActionDelegate> _requestActionHook;
+        private Hook<UseActionDelegate>? _requestActionHook;
 
         private ExcelSheet<Action>? _sheet;
 
@@ -172,14 +184,15 @@ namespace DelvUI.Helpers
         private bool HandleRequestAction(IntPtr manager, ActionType actionType, uint actionId, GameObjectID targetId, uint a4, uint a5,
                                           uint a6, IntPtr a7)
         {
+            if (_requestActionHook == null) { return false; }
+
             if (_config.MouseoverEnabled && _config.MouseoverAutomaticMode && IsActionValid(actionId, _target))
             {
                 GameObjectID target = new() { ObjectID = _target!.ObjectId };
-                //return _requestActionHook.Original(manager, actionType, actionId, target, a4, a5, a6, a7);
+                return _requestActionHook.Original(manager, actionType, actionId, target, a4, a5, a6, a7);
             }
 
-            //return _requestActionHook.Original(manager, actionType, actionId, targetId, a4, a5, a6, a7);
-            return true;
+            return _requestActionHook.Original(manager, actionType, actionId, targetId, a4, a5, a6, a7);
         }
 
         private bool IsActionValid(ulong actionID, GameObject? target)

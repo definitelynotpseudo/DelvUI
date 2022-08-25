@@ -1,3 +1,22 @@
+# 1.4.0.0
+Features:
+- Added support for Patch 6.2 and Dalamud Api7.
+
+Fixes:
+- Fixed the Echo status effect not being removed when right clicking on it.
+
+# 1.3.1.1
+- Fixed crash related to obfuscated texts for Actions or Status Effects.
+
+# 1.3.1.0
+Features:
+- Added a setting to hide the player name while casting on the Party Frames.
+- Added shadow options to all bars and added shadow thickness for labels:
+  + Due to these changes, all labels' shadow settings will be reset.
+
+Fixes:
+- Blood Weapon and Delirium fill directions now follow the correct direction.
+
 # 1.3.0.0
 - Attempt to fix "seemingly random" crashes (mostly related to Window Clipping).
 

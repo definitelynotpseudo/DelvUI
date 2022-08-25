@@ -1,4 +1,4 @@
-﻿using Dalamud.Game.ClientState.Objects.Enums;
+using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Utility;
@@ -370,6 +370,16 @@ namespace DelvUI.Interface.StatusEffects
                         var iconPos = iconPositions[i];
                         var statusEffectData = list[i];
 
+                        // shadow
+                        if (Config.IconConfig.ShadowConfig! != null && Config.IconConfig.ShadowConfig.Enabled)
+                        {
+                            // Right Side
+                            drawList.AddRectFilled(iconPos + new Vector2(Config.IconConfig.Size.X, Config.IconConfig.ShadowConfig.Offset), iconPos + Config.IconConfig.Size + new Vector2(Config.IconConfig.ShadowConfig.Offset, Config.IconConfig.ShadowConfig.Offset) + new Vector2(Config.IconConfig.ShadowConfig.Thickness - 1, Config.IconConfig.ShadowConfig.Thickness - 1), Config.IconConfig.ShadowConfig.Color.Base);
+
+                            // Bottom Size
+                            drawList.AddRectFilled(iconPos + new Vector2(Config.IconConfig.ShadowConfig.Offset, Config.IconConfig.Size.Y), iconPos + Config.IconConfig.Size + new Vector2(Config.IconConfig.ShadowConfig.Offset, Config.IconConfig.ShadowConfig.Offset) + new Vector2(Config.IconConfig.ShadowConfig.Thickness - 1, Config.IconConfig.ShadowConfig.Thickness - 1), Config.IconConfig.ShadowConfig.Color.Base);
+                        }
+
                         // icon
                         var cropIcon = Config.IconConfig.CropIcon;
                         int stackCount = cropIcon ? 1 : statusEffectData.Data.MaxStacks > 0 ? statusEffectData.Status.StackCount : 0;
@@ -466,8 +476,9 @@ namespace DelvUI.Interface.StatusEffects
 
                 // remove buff on right click
                 bool isFromPlayer = data.Status.SourceID == Plugin.ClientState.LocalPlayer?.ObjectId;
+                bool isTheEcho = data.Status.StatusID is 42 or 239;
 
-                if (data.Data.Category == 1 && isFromPlayer && rightClick)
+                if (data.Data.Category == 1 && (isFromPlayer || isTheEcho) && rightClick)
                 {
                     ChatHelper.SendChatMessage("/statusoff \"" + data.Data.Name + "\"");
 
