@@ -392,7 +392,7 @@ namespace DelvUI.Helpers
             for (int i = 0; i < 200; i += 2)
             {
                 GameObject? actor = actors[i];
-                if (actor?.ObjectId == target.TargetObjectId)
+                if (actor?.ObjectId == target.TargetObjectId) 
                 {
                     return actor;
                 }

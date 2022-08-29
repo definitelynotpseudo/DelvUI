@@ -11,6 +11,7 @@ using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.Runtime.InteropServices;
 
 namespace DelvUI.Interface.Jobs
 {
@@ -183,7 +184,7 @@ namespace DelvUI.Interface.Jobs
             }
         }
 
-        private void DrawNinkiGauge(Vector2 origin, PlayerCharacter player)
+        private unsafe void DrawNinkiGauge(Vector2 origin, PlayerCharacter player)
         {
             NINGauge gauge = Plugin.JobGauges.Get<NINGauge>();
 
