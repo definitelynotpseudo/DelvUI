@@ -22,9 +22,11 @@ namespace DelvUI.Interface.Party
         #region Singleton
         public static PartyManager Instance { get; private set; } = null!;
         private PartyFramesConfig _config = null!;
+        private PartyFramesIconsConfig _iconsConfig = null!;
 
         private PartyManager()
         {
+            _readyCheckHelper = new PartyReadyCheckHelper();
             _raiseTracker = new PartyFramesRaiseTracker();
             _invulnTracker = new PartyFramesInvulnTracker();
             _cleanseTracker = new PartyFramesCleanseTracker();
@@ -59,6 +61,7 @@ namespace DelvUI.Interface.Party
                 return;
             }
 
+            _readyCheckHelper.Dispose();
             _raiseTracker.Dispose();
             _invulnTracker.Dispose();
             _cleanseTracker.Dispose();
@@ -78,6 +81,8 @@ namespace DelvUI.Interface.Party
 
             _config = sender.GetConfigObject<PartyFramesConfig>();
             _config.ValueChangeEvent += OnConfigPropertyChanged;
+
+            _iconsConfig = ConfigurationManager.Instance.GetConfigObject<PartyFramesIconsConfig>();
         }
 
         #endregion Singleton
@@ -109,6 +114,7 @@ namespace DelvUI.Interface.Party
         public IReadOnlyCollection<IPartyFramesMember> GroupMembers => _groupMembers.AsReadOnly();
         public uint MemberCount => (uint)_groupMembers.Count;
 
+        private PartyReadyCheckHelper _readyCheckHelper;
         private PartyFramesRaiseTracker _raiseTracker;
         private PartyFramesInvulnTracker _invulnTracker;
         private PartyFramesCleanseTracker _cleanseTracker;
@@ -178,6 +184,12 @@ namespace DelvUI.Interface.Party
                 }
             }
 
+            // ready check update
+            if (_iconsConfig.ReadyCheckStatus.Enabled)
+            {
+                _readyCheckHelper.Update(_iconsConfig.ReadyCheckStatus.Duration);
+            }
+
             try
             {
                 // trust
@@ -217,15 +229,17 @@ namespace DelvUI.Interface.Party
                     foreach (IPartyFramesMember member in _groupMembers)
                     {
                         int index = member.ObjectId == player.ObjectId ? 0 : member.Order - 1;
+                        ReadyCheckStatus readyCheckStatus = ReadyCheckStatusForMember(member, index, player.ObjectId);
+
                         uint jobId = JobIdForIndex(index);
                         jobsChanged = jobsChanged || jobId != member.JobId;
 
-                        if (index == 0 && member is PartyFramesMember m)
+                        if (index == 0)
                         {
-                            playerMember = m;
+                            playerMember = member as PartyFramesMember;
                         }
 
-                        member.Update(EnmityForIndex(index), StatusForIndex(index), IsPartyLeader(index), jobId);
+                        member.Update(EnmityForIndex(index), StatusForIndex(index), readyCheckStatus, IsPartyLeader(index), jobId);
                     }
 
                     if (jobsChanged & playerMember != null)
@@ -234,7 +248,7 @@ namespace DelvUI.Interface.Party
                     }
                 }
                 // cross world party
-                else if (Plugin.PartyList.Length < _realMemberCount)
+                else if (IsCrossWorldParty())
                 {
                     UpdateCrossWorldParty(player);
                 }
@@ -247,6 +261,51 @@ namespace DelvUI.Interface.Party
                 UpdateTrackers();
             }
             catch { }
+        }
+
+        private bool IsCrossWorldParty()
+        {
+            return Plugin.PartyList.Length < _realMemberCount;
+        }
+
+        private ReadyCheckStatus ReadyCheckStatusForMember(IPartyFramesMember member, int index, uint playerId)
+        {
+            if (!_iconsConfig.ReadyCheckStatus.Enabled) { return ReadyCheckStatus.None; }
+
+            bool isCrossWorld = IsCrossWorldParty();
+
+            // regular party
+            if (!isCrossWorld)
+            {
+                //  local player
+                if (member.ObjectId == playerId)
+                {
+                    return _readyCheckHelper.GetStatusForIndex(0, isCrossWorld);
+                }
+
+                // find index 
+                bool foundPlayer = false;
+                for (int i = 0; i < Plugin.PartyList.Length; i++)
+                {
+                    PartyMember dalamudMember = Plugin.PartyList.ElementAt(i);
+                    if (dalamudMember.ObjectId == playerId)
+                    {
+                        foundPlayer = true;
+                        continue;
+                    }
+
+                    if (dalamudMember.ObjectId == member.ObjectId)
+                    {
+                        return _readyCheckHelper.GetStatusForIndex(foundPlayer ? i : i + 1, isCrossWorld);
+                    }
+                }
+            }
+            else
+            {
+                return _readyCheckHelper.GetStatusForIndex(index, isCrossWorld);
+            }
+
+            return ReadyCheckStatus.None;
         }
 
         private void UpdateTrustParty(PlayerCharacter player, int trustCount)
@@ -270,7 +329,7 @@ namespace DelvUI.Interface.Party
             {
                 _groupMembers.Clear();
 
-                PartyFramesMember playerMember = new PartyFramesMember(player, 1, EnmityForIndex(0), PartyMemberStatus.None, true);
+                PartyFramesMember playerMember = new PartyFramesMember(player, 1, EnmityForIndex(0), PartyMemberStatus.None, ReadyCheckStatus.None, true);
                 _groupMembers.Add(playerMember);
 
                 int order = 2;
@@ -280,7 +339,7 @@ namespace DelvUI.Interface.Party
                     Character? trustChara = Utils.GetGameObjectByName(names[i]) as Character;
                     if (trustChara != null)
                     {
-                        _groupMembers.Add(new PartyFramesMember(trustChara, order, EnmityForTrustMemberIndex(i), PartyMemberStatus.None, false));
+                        _groupMembers.Add(new PartyFramesMember(trustChara, order, EnmityForTrustMemberIndex(i), PartyMemberStatus.None, ReadyCheckStatus.None, false));
                         order++;
                     }
                 }
@@ -293,11 +352,11 @@ namespace DelvUI.Interface.Party
                 {
                     if (_groupMembers[i].ObjectId == player.ObjectId)
                     {
-                        _groupMembers[i].Update(EnmityForIndex(0), PartyMemberStatus.None, true, player.ClassJob.Id);
+                        _groupMembers[i].Update(EnmityForIndex(0), PartyMemberStatus.None, ReadyCheckStatus.None, true, player.ClassJob.Id);
                     }
                     else
                     {
-                        _groupMembers[i].Update(EnmityForTrustMemberIndex(Math.Max(0, _groupMembers[i].Order - 2)), PartyMemberStatus.None, false, 0);
+                        _groupMembers[i].Update(EnmityForTrustMemberIndex(Math.Max(0, _groupMembers[i].Order - 2)), PartyMemberStatus.None, ReadyCheckStatus.None, false, 0);
                     }
                 }
             }
@@ -335,11 +394,11 @@ namespace DelvUI.Interface.Party
             {
                 _groupMembers.Clear();
 
-                _groupMembers.Add(new PartyFramesMember(player, 1, playerEnmity, PartyMemberStatus.None, true));
+                _groupMembers.Add(new PartyFramesMember(player, 1, playerEnmity, PartyMemberStatus.None, ReadyCheckStatus.None, true));
 
                 if (chocobo != null)
                 {
-                    _groupMembers.Add(new PartyFramesMember(chocobo, 2, chocoboEnmity, PartyMemberStatus.None, false));
+                    _groupMembers.Add(new PartyFramesMember(chocobo, 2, chocoboEnmity, PartyMemberStatus.None, ReadyCheckStatus.None, false));
                 }
 
                 MembersChangedEvent?.Invoke(this);
@@ -348,7 +407,7 @@ namespace DelvUI.Interface.Party
             {
                 for (int i = 0; i < _groupMembers.Count; i++)
                 {
-                    _groupMembers[i].Update(i == 0 ? playerEnmity : chocoboEnmity, PartyMemberStatus.None, i == 0, i == 0 ? player.ClassJob.Id : 0);
+                    _groupMembers[i].Update(i == 0 ? playerEnmity : chocoboEnmity, PartyMemberStatus.None, ReadyCheckStatus.None, i == 0, i == 0 ? player.ClassJob.Id : 0);
                 }
             }
         }
@@ -421,8 +480,8 @@ namespace DelvUI.Interface.Party
                 bool isPartyLeader = IsPartyLeader(i);
 
                 PartyFramesMember member = isPlayer ?
-                    new PartyFramesMember(player, order, enmity, status, isPartyLeader) :
-                    new PartyFramesMember(NameForIndex(i), order, JobIdForIndex(i), status, isPartyLeader);
+                    new PartyFramesMember(player, order, enmity, status, ReadyCheckStatus.None, isPartyLeader) :
+                    new PartyFramesMember(NameForIndex(i), order, JobIdForIndex(i), status, ReadyCheckStatus.None, isPartyLeader);
                 _groupMembers.Add(member);
             }
 
@@ -448,7 +507,7 @@ namespace DelvUI.Interface.Party
                 PartyMemberStatus status = StatusForIndex(index);
                 bool isPartyLeader = i == Plugin.PartyList.PartyLeaderIndex;
 
-                PartyFramesMember member = new PartyFramesMember(partyMember, order, enmity, status, isPartyLeader);
+                PartyFramesMember member = new PartyFramesMember(partyMember, order, enmity, status, ReadyCheckStatus.None, isPartyLeader);
 
                 if (isPlayer)
                 {
@@ -463,7 +522,7 @@ namespace DelvUI.Interface.Party
                     var companion = Utils.GetBattleChocobo(player);
                     if (companion is Character companionCharacter)
                     {
-                        _groupMembers.Add(new PartyFramesMember(companionCharacter, 10, EnmityLevel.Last, PartyMemberStatus.None, false));
+                        _groupMembers.Add(new PartyFramesMember(companionCharacter, 10, EnmityLevel.Last, PartyMemberStatus.None, ReadyCheckStatus.None, false));
                     }
                 }
             }
